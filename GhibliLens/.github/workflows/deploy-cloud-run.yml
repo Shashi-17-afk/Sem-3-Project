@@ -1,0 +1,83 @@
+name: Deploy GhibliLens to Cloud Run
+
+on:
+  push:
+    branches:
+      - main          # triggers on every push to main
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: us-central1
+  SERVICE_NAME: ghibilens-backend
+  IMAGE: gcr.io/${{ secrets.GCP_PROJECT_ID }}/ghibilens-backend
+
+jobs:
+  build-and-deploy:
+    name: Build, Push & Deploy
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write   # needed for Workload Identity Federation
+
+    steps:
+      # 1. Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Authenticate to Google Cloud
+      #    (Uses Workload Identity Federation — no long-lived key needed)
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      # 3. Set up gcloud CLI
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      # 4. Configure Docker to use gcloud as credential helper
+      - name: Configure Docker for GCR
+        run: gcloud auth configure-docker --quiet
+
+      # 5. Build the multi-stage Docker image
+      #    (Node builds React, Python image serves everything)
+      - name: Build Docker image
+        run: |
+          docker build \
+            -f backend/Dockerfile \
+            -t ${{ env.IMAGE }}:${{ github.sha }} \
+            -t ${{ env.IMAGE }}:latest \
+            .
+
+      # 6. Push image to Google Container Registry
+      - name: Push image to GCR
+        run: |
+          docker push ${{ env.IMAGE }}:${{ github.sha }}
+          docker push ${{ env.IMAGE }}:latest
+
+      # 7. Deploy to Cloud Run
+      - name: Deploy to Cloud Run
+        id: deploy
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.SERVICE_NAME }}
+          region: ${{ env.REGION }}
+          image: ${{ env.IMAGE }}:${{ github.sha }}
+          env_vars: |
+            REPLICATE_API_TOKEN=${{ secrets.REPLICATE_API_TOKEN }}
+            TEMP_DIR=/tmp/jobs
+          flags: |
+            --allow-unauthenticated
+            --memory=2Gi
+            --cpu=2
+            --timeout=300
+            --concurrency=10
+            --max-instances=5
+
+      # 8. Print the live URL
+      - name: Show deployment URL
+        run: |
+          echo "✅ GhibliLens deployed!"
+          echo "🌿 Live URL: ${{ steps.deploy.outputs.url }}"

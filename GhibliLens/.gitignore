@@ -1,0 +1,50 @@
+# ── Python ───────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# uv
+uv.lock         # keep this — but ignore resolved cache
+.uv/
+
+# Environment secrets (NEVER commit)
+.env
+.env.local
+.env.*.local
+
+# Temp job files (can be GBs of video data)
+backend/temp_jobs/
+backend/test_output/
+backend/test_frame.png
+
+# ── Node / Frontend ───────────────
+node_modules/
+frontend/dist/
+frontend/build/
+.npm/
+
+# ── IDE / OS ──────────────────────
+.vscode/
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Docker ────────────────────────
+*.log
+
+# ── Test artifacts ────────────────
+.pytest_cache/
+htmlcov/
+.coverage
